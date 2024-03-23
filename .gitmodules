@@ -1,0 +1,3 @@
+[submodule "libs/reqwestx_go"]
+	path = libs/reqwestx_go
+	url = git@github.com:cxw620/lib_reqwestx_go.git

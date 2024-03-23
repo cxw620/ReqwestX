@@ -1,0 +1,13 @@
+[package]
+name = "reqwest_x"
+version = "0.1.0-alpha.0"
+description = "higher level HTTP client library based on Reqwest"
+keywords = ["http", "request", "client"]
+categories = ["web-programming::http-client", "wasm"]
+repository = "https://github.com/cxw620/ReqwestX"
+# documentation = "https://docs.rs/reqwest_x"
+authors = ["Hantong Chen"]
+readme = "README.md"
+license = "GPL-3.0-only"
+edition = "2021"
+rust-version = "1.76"
