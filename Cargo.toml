@@ -1,0 +1,28 @@
+[package]
+name = "reqwest_x"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+
+[dependencies]
+# dev deps
+ahash = "0.8"
+anyhow = "1.0"
+num_enum = "0.7"
+thiserror = "1.0"
+
+# hyper-like deps
+http = "1.1"
+
+# async deps
+tokio = { version = "1", features = ["full"] }
+
+# rust2go deps
+# Local repo for test only
+rust2go = { path = "/home/hantong/Sync/LocalDevelop/LocalRepo/Dependence/rust2go/rust2go", version = "0.3.8" }
+
+
+[build-dependencies]
+# rust2go deps
+# Local repo for test only
+rust2go = { path = "/home/hantong/Sync/LocalDevelop/LocalRepo/Dependence/rust2go/rust2go", version = "0.3.8", features = ["build"] }
