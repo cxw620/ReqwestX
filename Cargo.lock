@@ -674,7 +674,7 @@ checksum = "adad44e29e4c806119491a7f06f03de4d1af22c3a680dd47f1e6e179439d1f56"
 
 [[package]]
 name = "reqwest_x"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -689,6 +689,8 @@ dependencies = [
 [[package]]
 name = "rust2go"
 version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83dfc41f34236e0acc4985014e5f841bd5c5261b0c1e6580b2f2d0791f8031bc"
 dependencies = [
  "bindgen",
  "rust2go-cli",
@@ -699,6 +701,8 @@ dependencies = [
 [[package]]
 name = "rust2go-cli"
 version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1c1649d8de4744a62ea23fa20cd2d39d872122d6b26f4dc3f7f8c72f3e718af"
 dependencies = [
  "cbindgen",
  "clap",
@@ -708,6 +712,8 @@ dependencies = [
 [[package]]
 name = "rust2go-common"
 version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a6ddfede1797ac93e229dfc4ccbfb42fb86b44c5d97a54d21eb32af97b618e1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -717,6 +723,8 @@ dependencies = [
 [[package]]
 name = "rust2go-macro"
 version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acea55d172dfecebfc490c3d085e47c9d6934de941bab7eae055595e0658c048"
 dependencies = [
  "proc-macro2",
  "quote",
