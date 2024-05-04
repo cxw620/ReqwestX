@@ -47,28 +47,43 @@ pub trait ReqwestxGoInit {
     ///
     /// If you want to use your own template, you can use `set_client_hello_id` to set the ClientHelloID,
     /// and provide any necessary setting
-    fn init_client(config: ClientConfig) -> GoResult;
+    #[send]
+    #[drop_safe]
+    fn init_client(config: ClientConfigFfi) -> GoResultFfi;
 
     /// Set proxy
-    fn set_proxy_ffi(proxy: String) -> GoResult;
+    #[send]
+    #[drop_safe]
+    fn set_proxy_ffi(proxy: String) -> GoResultFfi;
 
     /// Manually set client impersonation config for adv usage
-    fn update_impersonation_config(config: ImpersonationConfig) -> GoResult;
+    #[send]
+    #[drop_safe]
+    fn update_impersonation_config(config: ImpersonationConfigFfi) -> GoResultFfi;
+
+    /// Manually GC
+    fn force_gc(data: bool) -> GoResultFfi;
 }
 
 #[derive(Debug, rust2go::R2G)]
-pub struct GoResult {
+#[repr(C)]
+pub struct GoResultFfi {
     code: i32,
     message: String,
 }
 
-impl_go_result!(GoResult);
+impl_go_result!(GoResultFfi);
 
 // === usage: init_client ===
 
 #[derive(Debug, rust2go::R2G)]
-pub struct ClientConfig {
+#[repr(C)]
+pub struct ClientConfigFfi {
     /// Proxy address, accept http, https and socks5
+    ///
+    /// # Special value
+    /// - `""` or `"direct"`: direct connection. Default value without init.
+    /// - `"auto"` or `"env"`: auto detect proxy from env.
     pub proxy: String,
     /// basic impersonation config, only accept pre-defined template
     /// - Chrome 0, will use utls.HelloChrome_106_Shuffle
@@ -80,7 +95,8 @@ pub struct ClientConfig {
 // === usage: update_impersonation_config ===
 
 #[derive(Debug, rust2go::R2G)]
-pub struct ImpersonationConfig {
+#[repr(C)]
+pub struct ImpersonationConfigFfi {
     /// TLS Fingerprint Impersonation
     pub utls_config: UTlsConfigFfi,
     /// HTTP2 Fingerprint Impersonation
@@ -100,18 +116,21 @@ pub struct ImpersonationConfig {
 // === UTLS Config ===
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct UTlsConfigFfi {
     pub id: ClientHelloIdFfi,
     pub spec: ClientHelloSpecFfi,
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct ClientHelloIdFfi {
     pub client: String,
     pub version: String,
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct ClientHelloSpecFfi {
     pub cipher_suites: Vec<u16>,
     pub compression_methods: Vec<u8>,
@@ -121,6 +140,7 @@ pub struct ClientHelloSpecFfi {
 }
 
 #[derive(Debug, Default, rust2go::R2G)]
+#[repr(C)]
 pub struct TlsExtensionFfi {
     pub ext_type: u16,
     pub vec_u32: Vec<u32>,
@@ -135,12 +155,14 @@ pub struct TlsExtensionFfi {
 // === HTTP2 Fingerprint Config ===
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct Http2SettingFfi {
-    pub id: u16,
-    pub val: u32,
+    pub setting_id: u16,
+    pub setting_val: u32,
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct Http2PriorityParamFfi {
     pub stream_dep: u32,
     pub exclusive: bool,
@@ -157,6 +179,7 @@ pub trait ReqwestxGo {
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct HttpRequestFfi {
     pub url: String,
     pub method: u8,
@@ -165,12 +188,14 @@ pub struct HttpRequestFfi {
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct HttpHeaderFfi {
     pub k: String,
     pub v: Vec<String>,
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct HttpResponseFfi {
     /// StatusCode
     pub code: isize,
@@ -185,6 +210,7 @@ pub struct HttpResponseFfi {
 }
 
 #[derive(Debug, rust2go::R2G)]
+#[repr(C)]
 pub struct GoResultHttpResponseFfi {
     code: i32,
     message: String,

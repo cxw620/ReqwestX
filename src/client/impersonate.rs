@@ -1,4 +1,58 @@
-use crate::ffi::{ClientHelloIdFfi, ClientHelloSpecFfi, TlsExtensionFfi, UTlsConfigFfi};
+use http::HeaderMap;
+
+use crate::ffi::{
+    ClientHelloIdFfi, ClientHelloSpecFfi, HttpHeaderFfi, ImpersonationConfigFfi, TlsExtensionFfi,
+    UTlsConfigFfi,
+};
+
+pub use crate::ffi::{
+    Http2PriorityParamFfi as Http2PriorityParam, Http2SettingFfi as Http2Setting,
+};
+
+#[derive(Debug)]
+pub struct ImpersonationConfig {
+    /// TLS Fingerprint Impersonation
+    pub utls_config: UTlsConfig,
+    /// HTTP2 Fingerprint Impersonation
+    pub http2_settings_frame: Vec<Http2Setting>,
+    /// HTTP2 Connection flow
+    pub http2_connection_flow: u32,
+    /// Common Pseudo Header Order
+    pub common_pseudo_header_order: Vec<String>,
+    /// Common Header Order
+    pub common_header_order: Vec<String>,
+    /// Brower's common headers
+    pub common_headers: HeaderMap,
+    /// HTTP2 Header Priority, for HTTP2 fingerprint fmpersonation
+    pub http2_header_priority: Http2PriorityParam,
+}
+
+impl From<ImpersonationConfig> for ImpersonationConfigFfi {
+    fn from(value: ImpersonationConfig) -> Self {
+        let mut common_headers = Vec::with_capacity(value.common_headers.len());
+        value.common_headers.keys().into_iter().for_each(|key| {
+            let v = value
+                .common_headers
+                .get_all(key)
+                .iter()
+                .map(|v| v.to_str().unwrap_or_default().to_string())
+                .collect();
+            common_headers.push(HttpHeaderFfi {
+                k: key.to_string(),
+                v,
+            });
+        });
+        Self {
+            utls_config: value.utls_config.into(),
+            http2_settings_frame: value.http2_settings_frame,
+            http2_connection_flow: value.http2_connection_flow,
+            common_pseudo_header_order: value.common_pseudo_header_order,
+            common_header_order: value.common_header_order,
+            common_headers,
+            http2_header_priority: value.http2_header_priority,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct UTlsConfig {
@@ -69,7 +123,7 @@ pub struct ClientHelloSpec {
 impl Default for ClientHelloSpec {
     fn default() -> Self {
         Self {
-            cipher_suites: Vec::new(),
+            cipher_suites: Vec::with_capacity(32),
             compression_methods: vec![0],
             extensions: Vec::with_capacity(32),
             tls_version_min: TlsVersion::VersionTLS12,
@@ -121,8 +175,22 @@ impl ClientHelloSpec {
     }
 
     #[inline]
-    pub fn set_extensions(mut self, extensions: Vec<TlsExtension>) -> Self {
-        self.extensions = extensions;
+    /// Set tls extensions
+    ///
+    /// # Params
+    /// - `enable_shuffle`: enable shuffle extensions.
+    ///
+    ///    ShuffleChromeTLSExtensions shuffles the extensions in the ClientHelloSpec to avoid ossification.
+    ///    It shuffles every extension except GREASE, padding and pre_shared_key extensions.
+    ///
+    ///    This feature was first introduced by **Chrome 106**.
+    /// - `extensions`: tls extensions
+    pub fn set_extensions(mut self, enable_shuffle: bool, extensions: Vec<TlsExtension>) -> Self {
+        self.extensions = if enable_shuffle {
+            Self::shuffle_chrome_tls_extensions(extensions)
+        } else {
+            extensions
+        };
         self
     }
 
@@ -137,6 +205,38 @@ impl ClientHelloSpec {
         self.tls_version_max = tls_version_max;
         self
     }
+
+    fn shuffle_chrome_tls_extensions(mut exts: Vec<TlsExtension>) -> Vec<TlsExtension> {
+        use rand::Rng;
+
+        // `skip_shuf` checks if the `exts[idx]` is a GREASE/padding/pre_shared_key extension,
+        // and returns true on success. For these extensions are considered positionally invariant.
+        let skip_shuf = |exts: &Vec<TlsExtension>, idx: usize| -> bool {
+            match &exts[idx] {
+                TlsExtension::TLSGrease => true,
+                TlsExtension::UtlsExtensionPadding => true,
+                TlsExtension::FakeExtensionPreSharedKey => true,
+                _ => false,
+            }
+        };
+
+        let swap = |i: usize, j: usize, exts: &mut Vec<TlsExtension>| {
+            if skip_shuf(&exts, i) || skip_shuf(&exts, j) {
+                return;
+            }
+            exts.swap(i, j);
+        };
+
+        let mut rng = rand::thread_rng();
+        for i in (1..exts.len()).rev() {
+            // invariant: elements with index > i have been locked in place.
+            let j = rng.gen_range(0..(i + 1));
+
+            swap(i, j, &mut exts);
+        }
+
+        exts
+    }
 }
 
 impl From<ClientHelloSpec> for ClientHelloSpecFfi {
@@ -150,6 +250,10 @@ impl From<ClientHelloSpec> for ClientHelloSpecFfi {
         }
     }
 }
+
+// based on spec's GreaseStyle, GREASE_PLACEHOLDER may be replaced by another GREASE value
+// https://tools.ietf.org/html/draft-ietf-tls-grease-01
+pub static GREASE_PLACEHOLDER: u16 = 0x0a0a;
 
 // A list of cipher suite IDs that are, or have been, implemented by this
 // package.
@@ -198,12 +302,12 @@ pub static TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305: u16 =
 #[derive(Debug)]
 #[repr(u16)]
 pub enum TlsExtension {
-    ServerName(String) = 0,
+    ServerName = 0,
     StatusRequest = 5,
-    SupportedCurves(Vec<u16>) = 10, // supported_groups in TLS 1.3, see RFC 8446, Section 4.2.7
+    SupportedCurves(Vec<CurveID>) = 10, // supported_groups in TLS 1.3, see RFC 8446, Section 4.2.7
     SupportedPoints(Vec<u8>) = 11,
-    SignatureAlgorithms(Vec<u16>) = 13,
-    ALPN(Vec<String>) = 16,
+    SignatureAlgorithms(Vec<SignatureScheme>) = 13,
+    ALPN(Vec<&'static str>) = 16,
     StatusRequestV2 = 17,
     SCT = 18,
     ExtendedMasterSecret = 23,
@@ -211,7 +315,7 @@ pub enum TlsExtension {
     SupportedVersions(Vec<u16>) = 43,
     PSKModes(Vec<u8>) = 45,
     SignatureAlgorithmsCert(Vec<SignatureScheme>) = 50,
-    KeyShare(Vec<(u16, Vec<u8>)>) = 51,
+    KeyShare(Vec<(CurveID, Vec<u8>)>) = 51,
     QUICTransportParameters = 57, // do not support customize its content
     RenegotiationInfo(isize, Vec<u8>) = 0xff01,
 
@@ -231,7 +335,7 @@ pub enum TlsExtension {
     FakeExtensionChannelID(bool) = 30032, // not IANA assigned
 
     // === Chrome specified ===
-    TLSGrease(u16) = 0xFFFE,
+    TLSGrease = 0x0a0a,
 
     // === Custom One ===
     Custom(u16) = 0xFFFF,
@@ -246,9 +350,8 @@ pub enum TlsExtension {
 impl From<TlsExtension> for TlsExtensionFfi {
     fn from(ext: TlsExtension) -> TlsExtensionFfi {
         match ext {
-            TlsExtension::ServerName(server_name) => Self {
+            TlsExtension::ServerName => Self {
                 ext_type: 0,
-                vec_string: vec![server_name],
                 ..Default::default()
             },
             TlsExtension::StatusRequest => Self {
@@ -257,7 +360,16 @@ impl From<TlsExtension> for TlsExtensionFfi {
             },
             TlsExtension::SupportedCurves(curves) => Self {
                 ext_type: 10,
-                vec_u16: curves,
+                vec_u16: curves
+                    .into_iter()
+                    .map(|curve| match curve {
+                        CurveID::CurveP256 => 23,
+                        CurveID::CurveP384 => 24,
+                        CurveID::CurveP521 => 25,
+                        CurveID::X25519 => 29,
+                        CurveID::Custom(id) => id,
+                    })
+                    .collect(),
                 ..Default::default()
             },
             TlsExtension::SupportedPoints(points) => Self {
@@ -267,12 +379,12 @@ impl From<TlsExtension> for TlsExtensionFfi {
             },
             TlsExtension::SignatureAlgorithms(schemes) => Self {
                 ext_type: 13,
-                vec_u16: schemes,
+                vec_u16: schemes.into_iter().map(|scheme| scheme as u16).collect(),
                 ..Default::default()
             },
             TlsExtension::ALPN(protocols) => Self {
                 ext_type: 16,
-                vec_string: protocols,
+                vec_string: protocols.iter().map(|&s| s.to_string()).collect(),
                 ..Default::default()
             },
             TlsExtension::StatusRequestV2 => Self {
@@ -312,6 +424,13 @@ impl From<TlsExtension> for TlsExtensionFfi {
                 let mut vec_usize = Vec::with_capacity(shares.len() * 3);
 
                 shares.into_iter().for_each(|(group, keys)| {
+                    let group = match group {
+                        CurveID::CurveP256 => 23,
+                        CurveID::CurveP384 => 24,
+                        CurveID::CurveP521 => 25,
+                        CurveID::X25519 => 29,
+                        CurveID::Custom(id) => id,
+                    };
                     vec_u16.push(group);
                     vec_usize.push(keys.len());
                     vec_u8.extend(keys);
@@ -391,8 +510,8 @@ impl From<TlsExtension> for TlsExtensionFfi {
                 data_bool: enabled,
                 ..Default::default()
             },
-            TlsExtension::TLSGrease(ext_type) => Self {
-                ext_type,
+            TlsExtension::TLSGrease => Self {
+                ext_type: GREASE_PLACEHOLDER,
                 ..Default::default()
             },
             TlsExtension::Custom(ext_type) => Self {
@@ -404,6 +523,16 @@ impl From<TlsExtension> for TlsExtensionFfi {
 }
 
 #[derive(Debug)]
+#[repr(u16)]
+pub enum CurveID {
+    CurveP256 = 23,
+    CurveP384 = 24,
+    CurveP521 = 25,
+    X25519 = 29,
+    Custom(u16) = 0xFFFF,
+}
+
+#[derive(Debug, Copy, Clone)]
 #[repr(u16)]
 pub enum SignatureScheme {
     // RSASSA-PKCS1-v1_5 algorithms.

@@ -10,6 +10,7 @@ license-file = "LICENSE"
 ahash = "0.8"
 anyhow = "1.0"
 num_enum = "0.7"
+rand = "0.8"
 thiserror = "1.0"
 
 # hyper-like deps
