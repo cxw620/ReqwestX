@@ -51,6 +51,11 @@ pub trait ReqwestxGoInit {
     #[drop_safe]
     fn init_client(config: ClientConfigFfi) -> GoResultFfi;
 
+    /// Allow insecure connection
+    #[send]
+    #[drop_safe]
+    fn client_allow_insecure(data: bool) -> GoResultFfi;
+
     /// Set proxy
     #[send]
     #[drop_safe]
@@ -79,17 +84,35 @@ impl_go_result!(GoResultFfi);
 #[derive(Debug, rust2go::R2G)]
 #[repr(C)]
 pub struct ClientConfigFfi {
+    /// Enable debug mode
+    pub debug: bool,
+
+    /// Allow insecure connection
+    pub allow_insecure: bool,
+
     /// Proxy address, accept http, https and socks5
     ///
     /// # Special value
     /// - `""` or `"direct"`: direct connection. Default value without init.
     /// - `"auto"` or `"env"`: auto detect proxy from env.
     pub proxy: String,
+
     /// basic impersonation config, only accept pre-defined template
     /// - Chrome 0, will use utls.HelloChrome_106_Shuffle
     /// - Firefox 1, will use utls.HelloFirefox_105
     /// - Safari 2, will use utls.HelloSafari_16_0
     pub impersonation_template: u8,
+}
+
+impl Default for ClientConfigFfi {
+    fn default() -> Self {
+        Self {
+            debug: cfg!(debug_assertions),
+            allow_insecure: false,
+            proxy: "direct".to_string(),
+            impersonation_template: 0xff,
+        }
+    }
 }
 
 // === usage: update_impersonation_config ===

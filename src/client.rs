@@ -12,6 +12,12 @@ pub fn init_client(config: ClientConfig) {
     ReqwestxGoInitImpl::init_client(config);
 }
 
+/// Allow insecure connection
+#[inline]
+pub fn client_allow_insecure(data: bool) {
+    ReqwestxGoInitImpl::client_allow_insecure(data);
+}
+
 /// Set proxy
 #[inline]
 pub fn set_proxy(proxy: String) {
@@ -34,11 +40,11 @@ mod tests {
     async fn test_client() {
         let config = ClientConfig {
             proxy: "socks5://127.0.0.1:9923".to_string(),
-            impersonation_template: 0,
+            ..Default::default()
         };
         init_client(config);
 
-        let uri = "https://tls.peet.ws/api/all".parse().unwrap();
+        let uri = "https://api.myip.la/cn".parse().unwrap();
         let response = Request::get(uri).execute().await.unwrap();
         assert_eq!(response.status().as_u16(), 200);
         println!("response.version: {:?}", response.version());
@@ -52,8 +58,7 @@ mod tests {
     #[tokio::test]
     async fn test_custom_client() {
         let config = ClientConfig {
-            proxy: "direct".to_string(),
-            impersonation_template: 0xff,
+            ..Default::default()
         };
         init_client(config);
 
